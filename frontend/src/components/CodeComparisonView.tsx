@@ -1,4 +1,3 @@
-import React from "react";
 import Editor from "@monaco-editor/react";
 
 interface WarningItem {
@@ -13,7 +12,7 @@ interface Props {
   warnings: WarningItem[];
 }
 
-const CodeComparisonView: React.FC<Props> = ({ cudaCode, hipCode, warnings }) => {
+export default function CodeComparisonView({ cudaCode, hipCode, warnings }: Props) {
   return (
     <section className="bg-slate-900 border border-slate-700 rounded-xl p-4 space-y-3">
       <h2 className="text-xl font-semibold">CUDA vs HIP Comparison</h2>
@@ -58,6 +57,4 @@ const CodeComparisonView: React.FC<Props> = ({ cudaCode, hipCode, warnings }) =>
       </div>
     </section>
   );
-};
-
-export default CodeComparisonView;
+}

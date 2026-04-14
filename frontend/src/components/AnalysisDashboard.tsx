@@ -1,4 +1,3 @@
-import React from "react";
 import {
   ArcElement,
   BarElement,
@@ -23,7 +22,7 @@ interface Props {
   warnings: WarningItem[];
 }
 
-const AnalysisDashboard: React.FC<Props> = ({ result, warnings }) => {
+export default function AnalysisDashboard({ result, warnings }: Props) {
   const gaugeData = {
     labels: ["Compatibility", "Remaining"],
     datasets: [
@@ -79,6 +78,4 @@ const AnalysisDashboard: React.FC<Props> = ({ result, warnings }) => {
       </div>
     </section>
   );
-};
-
-export default AnalysisDashboard;
+}

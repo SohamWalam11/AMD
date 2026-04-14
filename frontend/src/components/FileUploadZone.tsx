@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import { useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 
 interface Props {
@@ -6,7 +6,7 @@ interface Props {
   loading: boolean;
 }
 
-const FileUploadZone: React.FC<Props> = ({ onAnalyze, loading }) => {
+export default function FileUploadZone({ onAnalyze, loading }: Props) {
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
       const cuFiles = acceptedFiles.filter((file) => file.name.endsWith(".cu"));
@@ -38,6 +38,4 @@ const FileUploadZone: React.FC<Props> = ({ onAnalyze, loading }) => {
       {loading && <p className="mt-3 text-cyan-300">Analyzing CUDA codebase...</p>}
     </section>
   );
-};
-
-export default FileUploadZone;
+}

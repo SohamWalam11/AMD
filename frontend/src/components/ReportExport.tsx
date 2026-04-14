@@ -1,4 +1,3 @@
-import React from "react";
 import jsPDF from "jspdf";
 import { AnalysisResult } from "../App";
 
@@ -7,7 +6,7 @@ interface Props {
   cudaCode: string;
 }
 
-const ReportExport: React.FC<Props> = ({ result }) => {
+export default function ReportExport({ result }: Props) {
   const downloadHip = () => {
     const blob = new Blob([result.hip_code], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
@@ -57,6 +56,4 @@ const ReportExport: React.FC<Props> = ({ result }) => {
       </a>
     </section>
   );
-};
-
-export default ReportExport;
+}
