@@ -1,0 +1,9 @@
+{
+  "file": "matrix_mul.cu",
+  "compatibility_score": 88,
+  "performance_prediction": "+15%",
+  "effort_hours": 14,
+  "execution_time_ms": 1.72,
+  "hardware": "AMD Instinct MI300X",
+  "notes": "Demo benchmark output"
+}

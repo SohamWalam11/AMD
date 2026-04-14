@@ -1,0 +1,161 @@
+from __future__ import annotations
+
+import json
+import os
+import re
+from dataclasses import dataclass
+from typing import Any, Dict, List
+
+import numpy as np
+from sklearn.ensemble import RandomForestClassifier
+
+
+@dataclass(slots=True)
+class CompatibilityReport:
+    compatibility_score: int
+    performance_prediction: str
+    confidence: str
+    challenges: List[str]
+    recommendations: List[str]
+
+
+def _train_default_model() -> RandomForestClassifier:
+    features = np.array(
+        [
+            [20, 0, 2],
+            [35, 1, 3],
+            [50, 1, 5],
+            [65, 2, 6],
+            [80, 3, 7],
+            [90, 4, 8],
+            [30, 0, 1],
+            [45, 1, 4],
+            [75, 3, 6],
+        ]
+    )
+    targets = np.array([2, 2, 1, 1, 0, 0, 2, 1, 0])
+
+    model = RandomForestClassifier(n_estimators=64, random_state=42)
+    model.fit(features, targets)
+    return model
+
+
+_MODEL = _train_default_model()
+
+
+def _build_features(cuda_patterns: Dict[str, Any]) -> np.ndarray:
+    complexity = int(cuda_patterns.get("complexity", 0))
+    memory_patterns = cuda_patterns.get("memory_patterns", {})
+    memory_score = int(sum(1 for value in memory_patterns.values() if value))
+    api_usage = int(sum(len(v) for v in cuda_patterns.get("api_calls", {}).values()))
+    return np.array([complexity, memory_score, api_usage])
+
+
+def predict_compatibility_ml(features: np.ndarray) -> float:
+    """Predict compatibility score using a light ML fallback model."""
+    reshaped = np.asarray(features, dtype=float).reshape(1, -1)
+    proba = _MODEL.predict_proba(reshaped)[0]
+
+    category_score = {
+        0: 45.0,
+        1: 70.0,
+        2: 88.0,
+    }
+
+    weighted = 0.0
+    for class_idx, class_proba in enumerate(proba):
+        weighted += category_score.get(class_idx, 60.0) * float(class_proba)
+    return round(weighted, 2)
+
+
+def estimate_porting_effort(compatibility: float, complexity: int) -> int:
+    risk_factor = max(0.1, (100.0 - compatibility) / 100.0)
+    effort = int(4 + complexity * 0.35 + 40 * risk_factor)
+    return max(2, effort)
+
+
+async def analyze_with_claude(cuda_patterns: Dict[str, Any]) -> CompatibilityReport:
+    """
+    Analyze CUDA patterns using Claude Sonnet with ML fallback.
+    Requires ANTHROPIC_API_KEY in environment for API mode.
+    """
+    api_key = os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+
+    prompt = (
+        "You are an expert in CUDA and AMD ROCm/HIP migration. Analyze this CUDA code "
+        "pattern and provide:\n"
+        "1. Compatibility score (0-100) with AMD GPUs\n"
+        "2. Performance prediction (% faster/slower than NVIDIA)\n"
+        "3. Key migration challenges\n"
+        "4. Recommended HIP equivalent patterns\n\n"
+        f"CUDA Analysis:\n{json.dumps(cuda_patterns, indent=2)}\n\n"
+        "Respond in JSON format with keys: compatibility_score, performance_prediction, "
+        "confidence, challenges, recommendations."
+    )
+
+    if api_key:
+        try:
+            from anthropic import AsyncAnthropic  # type: ignore
+
+            client = AsyncAnthropic(api_key=api_key)
+            message = await client.messages.create(
+                model="claude-3-5-sonnet-latest",
+                max_tokens=700,
+                temperature=0.1,
+                system="Return only valid JSON.",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text_chunks = [
+                block.text for block in message.content if hasattr(block, "text")
+            ]
+            content = "\n".join(text_chunks).strip()
+            payload = _extract_json(content)
+            return CompatibilityReport(
+                compatibility_score=int(payload.get("compatibility_score", 70)),
+                performance_prediction=str(payload.get("performance_prediction", "0%")),
+                confidence=str(payload.get("confidence", "medium")),
+                challenges=list(payload.get("challenges", [])),
+                recommendations=list(payload.get("recommendations", [])),
+            )
+        except Exception:
+            pass
+
+    features = _build_features(cuda_patterns)
+    score = predict_compatibility_ml(features)
+    complexity = int(cuda_patterns.get("complexity", 0))
+    perf_delta = int((score - 70) / 2 - max(0, complexity - 60) * 0.2)
+
+    challenges = []
+    if cuda_patterns.get("dynamic_parallelism"):
+        challenges.append("Dynamic parallelism may not map efficiently to all AMD targets")
+    if cuda_patterns.get("texture_surface_ops"):
+        challenges.append("Texture/surface APIs need manual HIP adaptation")
+    if complexity > 70:
+        challenges.append("Kernel complexity suggests higher migration and tuning effort")
+
+    if not challenges:
+        challenges = ["Validate occupancy and LDS usage on target AMD architecture"]
+
+    recommendations = [
+        "Use HIP porting guide and hipify first pass",
+        "Prefer sync warp intrinsics and validate lane assumptions for wavefront size",
+        "Benchmark with rocprof and tune block size for MI300-class GPUs",
+    ]
+
+    return CompatibilityReport(
+        compatibility_score=int(round(score)),
+        performance_prediction=f"{perf_delta:+d}%",
+        confidence="medium",
+        challenges=challenges,
+        recommendations=recommendations,
+    )
+
+
+def _extract_json(text: str) -> Dict[str, Any]:
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"\{[\s\S]*\}", text)
+        if not match:
+            raise
+        return json.loads(match.group(0))
