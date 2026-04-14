@@ -93,6 +93,10 @@ npm run dev
 ## API Endpoints
 
 - `POST /api/analyze` - Upload CUDA `.cu` file for full analysis + HIP conversion
+- `POST /api/analyze/async` - Enqueue async analysis job with progress tracking
+- `GET /api/jobs/{job_id}` - Fetch async job status and result payload
+- `GET /api/jobs/{job_id}/stream` - SSE stream for live job progress events
+- `GET /api/history?limit=5` - Fetch recent completed analysis history
 - `POST /api/benchmark` - Run benchmark on submitted HIP code
 - `GET /api/benchmark/{code_hash}` - Fetch benchmark result cache
 - `GET /health` - Service health
