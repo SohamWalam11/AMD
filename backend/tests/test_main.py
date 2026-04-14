@@ -13,6 +13,24 @@ def test_health_endpoint() -> None:
     assert response.json()["status"] == "ok"
 
 
+def test_auth_token_flow() -> None:
+    client = TestClient(app)
+    reg = client.post(
+        "/auth/register",
+        json={"username": "tester_user", "password": "password123", "role": "user"},
+    )
+    assert reg.status_code in {200, 409}
+
+    token_resp = client.post(
+        "/auth/token",
+        data={"username": "tester_user", "password": "password123"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert token_resp.status_code == 200
+    payload = token_resp.json()
+    assert "access_token" in payload
+
+
 def test_async_analyze_and_history(monkeypatch) -> None:
     client = TestClient(app)
 
@@ -40,7 +58,7 @@ def test_async_analyze_and_history(monkeypatch) -> None:
         }
 
     monkeypatch.setattr(main, "_run_analysis_pipeline", fake_pipeline)
-    monkeypatch.setattr(main, "_save_history", lambda: None)
+    monkeypatch.setattr(main, "_save_list", lambda *args, **kwargs: None)
     main.ANALYSIS_HISTORY.clear()
     main.ANALYSIS_JOBS.clear()
 
@@ -51,7 +69,7 @@ def test_async_analyze_and_history(monkeypatch) -> None:
     assert enqueue_response.status_code == 200
     job_id = enqueue_response.json()["job_id"]
 
-    asyncio.run(main._process_async_job(job_id, "sample.cu", b"__global__ void k() {}"))
+    asyncio.run(main._process_async_job(job_id, "anonymous", "sample.cu", b"__global__ void k() {}"))
 
     status_response = client.get(f"/api/jobs/{job_id}")
     assert status_response.status_code == 200

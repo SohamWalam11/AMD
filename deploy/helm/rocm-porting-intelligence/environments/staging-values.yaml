@@ -1,0 +1,23 @@
+backend:
+  replicas: 1
+  env:
+    AUTH_REQUIRED: "false"
+
+frontend:
+  replicas: 1
+
+resources:
+  backend:
+    requests:
+      cpu: 150m
+      memory: 256Mi
+    limits:
+      cpu: 700m
+      memory: 768Mi
+  frontend:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 400m
+      memory: 256Mi

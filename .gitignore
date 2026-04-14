@@ -21,3 +21,7 @@ Thumbs.db
 frontend/src/*.js
 frontend/src/components/*.js
 frontend/*.tsbuildinfo
+
+# Runtime data
+data/*.json
+backend/data/*.json

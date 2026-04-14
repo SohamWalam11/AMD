@@ -69,6 +69,12 @@ interface HistoryItem {
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
+const getAuthHeaders = () => {
+  const token = localStorage.getItem("auth_token");
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
+};
+
 export default function App() {
   const [loading, setLoading] = useState(false);
   const [cudaCode, setCudaCode] = useState("");
@@ -79,7 +85,9 @@ export default function App() {
 
   const loadHistory = async () => {
     try {
-      const response = await axios.get<{ items: HistoryItem[] }>(`${API_BASE}/api/history?limit=5`);
+      const response = await axios.get<{ items: HistoryItem[] }>(`${API_BASE}/api/history?limit=5`, {
+        headers: getAuthHeaders()
+      });
       setHistoryItems(response.data.items ?? []);
     } catch {
       setHistoryItems([]);
@@ -115,14 +123,16 @@ export default function App() {
       formData.append("file", file);
 
       const enqueue = await axios.post<AsyncJobEnqueue>(`${API_BASE}/api/analyze/async`, formData, {
-        headers: { "Content-Type": "multipart/form-data" }
+        headers: { "Content-Type": "multipart/form-data", ...getAuthHeaders() }
       });
       setJobStatus(enqueue.data);
 
       const maxAttempts = 180;
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 500));
-        const statusResponse = await axios.get<AsyncJobStatus>(`${API_BASE}/api/jobs/${enqueue.data.job_id}`);
+        const statusResponse = await axios.get<AsyncJobStatus>(`${API_BASE}/api/jobs/${enqueue.data.job_id}`, {
+          headers: getAuthHeaders()
+        });
         setJobStatus(statusResponse.data);
 
         if (statusResponse.data.status === "completed") {

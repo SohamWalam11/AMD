@@ -1,0 +1,36 @@
+namespace: rocm-porting-intelligence
+
+backend:
+  image: ghcr.io/example/rocm-porting-intelligence-backend:latest
+  replicas: 1
+  port: 8000
+  env:
+    REDIS_URL: redis://redis:6379/0
+    CORS_ORIGINS: "*"
+    AUTH_REQUIRED: "false"
+
+frontend:
+  image: ghcr.io/example/rocm-porting-intelligence-frontend:latest
+  replicas: 1
+  port: 3000
+  env:
+    VITE_API_BASE: http://backend:8000
+
+service:
+  type: ClusterIP
+
+resources:
+  backend:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  frontend:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi

@@ -92,14 +92,24 @@ npm run dev
 
 ## API Endpoints
 
+- `POST /auth/register` - Register JWT user (`user` or `admin` role)
+- `POST /auth/token` - OAuth2 password login, returns JWT access token
+- `GET /auth/me` - Current user and role from token
 - `POST /api/analyze` - Upload CUDA `.cu` file for full analysis + HIP conversion
 - `POST /api/analyze/async` - Enqueue async analysis job with progress tracking
 - `GET /api/jobs/{job_id}` - Fetch async job status and result payload
 - `GET /api/jobs/{job_id}/stream` - SSE stream for live job progress events
 - `GET /api/history?limit=5` - Fetch recent completed analysis history
+- `GET /api/admin/history/all` - Admin-only access to all users history
 - `POST /api/benchmark` - Run benchmark on submitted HIP code
+- `POST /api/benchmark/matrix` - Benchmark matrix across devices and input sizes
 - `GET /api/benchmark/{code_hash}` - Fetch benchmark result cache
+- `GET /api/benchmark/runs` - Fetch predicted-vs-actual benchmark run history
+- `POST /api/compile-fix` - Run HIP compile-fix loop and parse diagnostics
+- `POST /api/model/train` - Admin-only calibrated model training pipeline
 - `GET /health` - Service health
+- `GET /ready` - Readiness probe
+- `GET /metrics` - Prometheus metrics endpoint
 
 ## Phase Mapping
 
@@ -138,8 +148,35 @@ It runs on every push and pull request and includes:
   - Dockerfile linting with Hadolint
   - Docker image build validation for backend and frontend
 
+Release workflow: `.github/workflows/release-ghcr.yml`
+
+- Builds and pushes backend/frontend images to GHCR
+- Triggered by version tags (`v*`) or manual dispatch
+
+## Deployment (Helm)
+
+Chart path: `deploy/helm/rocm-porting-intelligence`
+
+- Base values: `values.yaml`
+- Staging overlay: `environments/staging-values.yaml`
+- Production overlay: `environments/prod-values.yaml`
+
+Example:
+
+```bash
+helm upgrade --install rocm-intel deploy/helm/rocm-porting-intelligence \
+  -f deploy/helm/rocm-porting-intelligence/values.yaml \
+  -f deploy/helm/rocm-porting-intelligence/environments/staging-values.yaml
+```
+
+## Branch Protection
+
+Checklist: `docs/branch-protection-checklist.md`
+
 ## Notes
 
 - Claude API is optional. If unavailable, ML fallback scoring is used.
 - Redis rate limiting activates automatically when Redis is reachable.
 - MI300X benchmarking requires ROCm runtime + `hipcc` on target host.
+- JWT auth can be toggled with `AUTH_REQUIRED=true`.
+- Sentry activates when `SENTRY_DSN` is set.
