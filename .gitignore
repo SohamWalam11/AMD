@@ -17,3 +17,7 @@ Thumbs.db
 
 # Env
 .env
+
+frontend/src/*.js
+frontend/src/components/*.js
+frontend/*.tsbuildinfo
