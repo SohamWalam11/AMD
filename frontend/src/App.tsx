@@ -1,9 +1,6 @@
 import { useMemo, useState } from "react";
 import axios from "axios";
-import FileUploadZone from "./components/FileUploadZone";
-import AnalysisDashboard from "./components/AnalysisDashboard";
-import CodeComparisonView from "./components/CodeComparisonView";
-import ReportExport from "./components/ReportExport";
+import { AnalysisDashboard, CodeComparisonView, FileUploadZone, ReportExport } from "./components";
 
 export interface WarningItem {
   code?: string;
