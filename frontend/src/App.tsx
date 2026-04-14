@@ -9,12 +9,30 @@ export interface WarningItem {
   doc_url?: string;
 }
 
+export interface ExplainabilityFactor {
+  name: string;
+  value: number;
+  impact: "positive" | "neutral" | "negative";
+  reason: string;
+}
+
+export interface KernelRisk {
+  name: string;
+  complexity_score: number;
+  risk_score: number;
+  severity: "low" | "medium" | "high";
+  issues: WarningItem[];
+}
+
 export interface AnalysisResult {
   compatibility_score: number;
   performance_prediction: string;
   effort_hours: number;
   warnings: string[];
+  warning_details?: WarningItem[];
   recommendations: string[];
+  explainability?: ExplainabilityFactor[];
+  kernel_risks?: KernelRisk[];
   hip_code: string;
   analysis: {
     complexity: number;
@@ -37,6 +55,9 @@ export default function App() {
 
   const warningItems = useMemo(() => {
     if (!result) return [];
+    if (result.warning_details && result.warning_details.length > 0) {
+      return result.warning_details;
+    }
     return result.warnings.map((message, index) => ({
       message,
       severity: index === 0 ? "high" : "medium"

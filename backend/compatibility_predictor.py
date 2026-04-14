@@ -17,6 +17,8 @@ class CompatibilityReport:
     confidence: str
     challenges: List[str]
     recommendations: List[str]
+    explainability: List[Dict[str, Any]]
+    warning_details: List[Dict[str, str]]
 
 
 def _train_default_model() -> RandomForestClassifier:
@@ -74,6 +76,80 @@ def estimate_porting_effort(compatibility: float, complexity: int) -> int:
     return max(2, effort)
 
 
+def _build_explainability(cuda_patterns: Dict[str, Any], score: float) -> List[Dict[str, Any]]:
+    complexity = int(cuda_patterns.get("complexity", 0))
+    memory_patterns = cuda_patterns.get("memory_patterns", {})
+    api_calls = cuda_patterns.get("api_calls", {})
+    dynamic_parallelism = bool(cuda_patterns.get("dynamic_parallelism", False))
+    texture_surface = bool(cuda_patterns.get("texture_surface_ops", []))
+
+    factors: List[Dict[str, Any]] = [
+        {
+            "name": "Kernel complexity",
+            "value": complexity,
+            "impact": "negative" if complexity > 70 else "neutral",
+            "reason": "Higher control-flow/loop density generally increases migration tuning effort.",
+        },
+        {
+            "name": "Memory pattern diversity",
+            "value": int(sum(1 for value in memory_patterns.values() if value)),
+            "impact": "neutral",
+            "reason": "Mixed memory usage requires architecture-specific validation on ROCm.",
+        },
+        {
+            "name": "CUDA API surface",
+            "value": int(sum(len(v) for v in api_calls.values())),
+            "impact": "negative" if int(sum(len(v) for v in api_calls.values())) > 5 else "neutral",
+            "reason": "More CUDA runtime usage increases migration touchpoints.",
+        },
+    ]
+
+    if dynamic_parallelism:
+        factors.append(
+            {
+                "name": "Dynamic parallelism",
+                "value": 1,
+                "impact": "negative",
+                "reason": "Device-side launch patterns often need redesign for best ROCm support.",
+            }
+        )
+
+    if texture_surface:
+        factors.append(
+            {
+                "name": "Texture/surface usage",
+                "value": 1,
+                "impact": "negative",
+                "reason": "Texture/surface APIs typically require manual adaptation.",
+            }
+        )
+
+    factors.append(
+        {
+            "name": "Predicted compatibility",
+            "value": round(score, 2),
+            "impact": "positive" if score >= 80 else "neutral",
+            "reason": "Aggregate model score based on complexity, memory patterns, and API usage.",
+        }
+    )
+    return factors
+
+
+def _build_warning_details(challenges: List[str]) -> List[Dict[str, str]]:
+    details: List[Dict[str, str]] = []
+    for challenge in challenges:
+        severity = "high" if "dynamic" in challenge.lower() else "medium"
+        details.append(
+            {
+                "code": "MIGRATION_CHALLENGE",
+                "severity": severity,
+                "message": challenge,
+                "doc_url": "https://rocm.docs.amd.com/projects/HIP/en/latest/how-to/hip_porting_guide.html",
+            }
+        )
+    return details
+
+
 async def analyze_with_claude(cuda_patterns: Dict[str, Any]) -> CompatibilityReport:
     """
     Analyze CUDA patterns using Claude Sonnet with ML fallback.
@@ -116,6 +192,11 @@ async def analyze_with_claude(cuda_patterns: Dict[str, Any]) -> CompatibilityRep
                 confidence=str(payload.get("confidence", "medium")),
                 challenges=list(payload.get("challenges", [])),
                 recommendations=list(payload.get("recommendations", [])),
+                explainability=list(payload.get("explainability", [])) or _build_explainability(
+                    cuda_patterns, float(payload.get("compatibility_score", 70))
+                ),
+                warning_details=list(payload.get("warning_details", []))
+                or _build_warning_details(list(payload.get("challenges", []))),
             )
         except Exception:
             pass
@@ -148,6 +229,8 @@ async def analyze_with_claude(cuda_patterns: Dict[str, Any]) -> CompatibilityRep
         confidence="medium",
         challenges=challenges,
         recommendations=recommendations,
+        explainability=_build_explainability(cuda_patterns, float(score)),
+        warning_details=_build_warning_details(challenges),
     )
 
 

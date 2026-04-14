@@ -78,6 +78,27 @@ async def analyze_cuda_code(file: UploadFile = File(...)) -> JSONResponse:
     compatibility = await analyze_with_claude(analysis)
     warnings = compatibility.challenges
 
+    kernel_risks = []
+    for kernel in analysis.get("kernels", []):
+        issues = kernel.get("incompatible_patterns", [])
+        severity_rank = {"low": 1, "medium": 2, "high": 3}
+        highest = "low"
+        for issue in issues:
+            current = str(issue.get("severity", "low"))
+            if severity_rank.get(current, 1) > severity_rank.get(highest, 1):
+                highest = current
+
+        risk_score = int(min(100, kernel.get("complexity_score", 0) + (10 * len(issues))))
+        kernel_risks.append(
+            {
+                "name": kernel.get("name", "unknown"),
+                "complexity_score": kernel.get("complexity_score", 0),
+                "risk_score": risk_score,
+                "severity": highest,
+                "issues": issues,
+            }
+        )
+
     hip_code = convert_cuda_to_hip(cuda_code, warnings)
     hip_code = add_inline_annotations(hip_code, warnings)
 
@@ -90,7 +111,10 @@ async def analyze_cuda_code(file: UploadFile = File(...)) -> JSONResponse:
         "confidence": compatibility.confidence,
         "effort_hours": effort,
         "warnings": warnings,
+        "warning_details": compatibility.warning_details,
         "recommendations": compatibility.recommendations,
+        "explainability": compatibility.explainability,
+        "kernel_risks": kernel_risks,
         "analysis": analysis,
         "hip_code": hip_code,
         "migration_guide": generate_migration_guide(
